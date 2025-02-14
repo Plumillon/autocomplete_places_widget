@@ -367,6 +367,8 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
       widget.apiExceptionCallback?.call(e);
 
       return [];
+    } finally {
+      widget.loadingCallback?.call(false);
     }
   }
 
