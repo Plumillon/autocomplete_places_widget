@@ -19,7 +19,7 @@ A wrapper around Flutter’s default Autocomplete widget that leverages the Goog
 Import the package in your Dart file.
 
 ```dart
-import 'package:autocomplete_google_places_widget/autocomplete_google_places_widget.dart';
+import 'package:autocomplete_places_widget/autocomplete_places_widget.dart';
 ```
 
 Add your Google API key in the `GPlacesAutoComplete` widget.
