@@ -58,7 +58,7 @@ class MapboxPlacesProvider extends PlacesProvider {
     try {
       final prefix = config.proxyURL ?? "";
       final url =
-          "${prefix}https://api.mapbox.com/search/searchbox/v1/retrieve/${prediction.id}${config.apiKey != null ? "?access_token=${config.apiKey}" : ""}${config.useSessionToken ? "&session_token=$sessionToken" : ""}";
+          "${prefix}https://api.mapbox.com/search/searchbox/v1/retrieve/${prediction.id}?${config.apiKey != null ? "access_token=${config.apiKey}" : ""}${config.useSessionToken ? "&session_token=$sessionToken" : ""}";
       final response = await dio.get(url);
       final placeDetails = MapboxPlaceDetails.fromJson(response.data);
       prediction.details = placeDetails;
@@ -66,8 +66,11 @@ class MapboxPlacesProvider extends PlacesProvider {
       prediction.region = feature?.properties.context?.region;
       prediction.country = feature?.properties.context?.country;
       prediction.postalCode = feature?.properties.context?.postcode;
-      prediction.lat = feature?.geometry.coordinates[1];
-      prediction.lng = feature?.geometry.coordinates[0];
+
+      if (feature?.geometry != null && feature?.geometry.coordinates != null) {
+        prediction.lat = feature?.geometry.coordinates[1];
+        prediction.lng = feature?.geometry.coordinates[0];
+      }
 
       return prediction;
     } catch (e) {

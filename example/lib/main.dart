@@ -56,7 +56,7 @@ class _MyHomePageState extends State<MyHomePage> {
               PlacesAutoComplete(
                 providerConfig: MapboxPlacesProviderConfig(
                   apiKey: _yourAPIKey,
-                  proxyURL: 'https://cors-anywhere.herokuapp.com/',
+                  proxyURL: 'https://placesautocomplete-production.up.railway.app/',
                   countries: const ['US'],
                   placeTypes: ['city'],
                 ),
