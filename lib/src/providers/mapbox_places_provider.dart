@@ -31,10 +31,10 @@ class MapboxPlacesProvider extends PlacesProvider {
     final prefix = config.proxyURL ?? "";
 
     String url =
-        "${prefix}https://api.mapbox.com/search/searchbox/v1/suggest?q=$text${config.apiKey != null ? "&access_token=$config.apiKey" : ""}";
+        "${prefix}https://api.mapbox.com/search/searchbox/v1/suggest?q=$text${config.apiKey != null ? "&access_token=${config.apiKey}" : ""}";
 
     if (config.countries.isNotEmpty) {
-      url = "&country:${config.countries.join(',')}";
+      url += "&country=${config.countries.join(',')}";
     }
 
     if (config.placeTypes.isNotEmpty) {
@@ -58,7 +58,7 @@ class MapboxPlacesProvider extends PlacesProvider {
     try {
       final prefix = config.proxyURL ?? "";
       final url =
-          "${prefix}https://api.mapbox.com/search/searchbox/v1/retrieve/${prediction.id}${config.apiKey != null ? "&key=${config.apiKey}" : ""}";
+          "${prefix}https://api.mapbox.com/search/searchbox/v1/retrieve/${prediction.id}${config.apiKey != null ? "?access_token=${config.apiKey}" : ""}${config.useSessionToken ? "&session_token=$sessionToken" : ""}";
       final response = await dio.get(url);
       final placeDetails = MapboxPlaceDetails.fromJson(response.data);
       prediction.details = placeDetails;
@@ -79,11 +79,21 @@ class MapboxPlacesProvider extends PlacesProvider {
   Future<List<Prediction>?> getPredictionsFromSharedPref() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final json = prefs.getStringList(predictionHistoryKey);
+    List<Prediction>? predictions;
 
     if (json == null) {
       return null;
     }
 
-    return json.map((e) => MapboxPrediction.fromJson(jsonDecode(e))).toList();
+    try {
+      predictions = json
+          .map(
+              (prediction) => MapboxPrediction.fromJson(jsonDecode(prediction)))
+          .toList();
+    } catch (e) {
+      predictions = null;
+    }
+
+    return predictions;
   }
 }

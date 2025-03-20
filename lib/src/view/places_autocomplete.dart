@@ -122,6 +122,12 @@ class PlacesAutoComplete extends StatefulWidget {
   /// }
   final void Function(Object apiExceptionCallback)? apiExceptionCallback;
 
+  /// A builder to customize how option are displayed.
+  /// This builder will be used to display the options in the text field when an option is selected
+  /// and in the prediction list.
+  /// If not provided, the default display [_PlacesAutoCompleteState._defaultDisplayStringForOption] will be used.
+  final String Function(Prediction)? displayStringForOption;
+
   /// Creates a new Google Places Autocomplete widget.
   /// The [apiKey] parameter is required if [proxyURL] is null.
   PlacesAutoComplete({
@@ -145,6 +151,7 @@ class PlacesAutoComplete extends StatefulWidget {
     this.menuBorderRadius = 8.0,
     this.loadingCallback,
     this.apiExceptionCallback,
+    this.displayStringForOption,
   })  : assert((focusNode == null) == (textEditingController == null),
             'textEditingController and focusNode must be provided together'),
         assert(
@@ -244,7 +251,7 @@ class _PlacesAutoCompleteState extends State<PlacesAutoComplete> {
     getPredictionsHistory();
   }
 
-  static String _displayStringForPrediction(Prediction prediction) =>
+  String _defaultDisplayStringForPrediction(Prediction prediction) =>
       prediction.name ?? '';
 
   @override
@@ -253,7 +260,8 @@ class _PlacesAutoCompleteState extends State<PlacesAutoComplete> {
     return RawAutocomplete<Prediction>(
       textEditingController: widget.textEditingController,
       focusNode: widget.focusNode,
-      displayStringForOption: _displayStringForPrediction,
+      displayStringForOption:
+          widget.displayStringForOption ?? _defaultDisplayStringForPrediction,
       fieldViewBuilder: (BuildContext context, TextEditingController controller,
           FocusNode focusNode, VoidCallback onFieldSubmitted) {
         return SizedBox(
@@ -337,8 +345,11 @@ class _PlacesAutoCompleteState extends State<PlacesAutoComplete> {
                                       : 0.0),
                             )),
                             dense: widget.denseMenuOption,
-                            title: Text(_displayStringForPrediction(
-                                options.elementAt(index))),
+                            title: Text(widget.displayStringForOption != null
+                                ? widget.displayStringForOption!(
+                                    options.elementAt(index))
+                                : _defaultDisplayStringForPrediction(
+                                    options.elementAt(index))),
                           );
                     }),
                   );

@@ -18,7 +18,9 @@ class MapboxPrediction extends Prediction {
       : super(
           id: json['mapbox_id'],
           name: json['name_preferred'] ?? json['name'],
-          types: [json['type']],
+          types: json['feature_type'] != null && json['feature_type'] is List
+              ? [json['feature_type']]
+              : [],
           region: json['context']['region'] != null
               ? json['context']['region']['region_code']
               : null,
@@ -35,11 +37,15 @@ class MapboxPrediction extends Prediction {
     return {
       'mapbox_id': id,
       'name': name,
-      'type': types.first,
+      if (types.isNotEmpty) 'feature_type': types.first,
       'context': {
         if (region != null) 'region': {'region_code': region},
         if (country != null) 'country': {'country_code': country},
         if (postalCode != null) 'postcode': {'name': postalCode},
+        if (lat != null && lng != null)
+          'geometry': {
+            'coordinates': [lng, lat],
+          },
       },
     };
   }
@@ -53,4 +59,9 @@ class MapboxPrediction extends Prediction {
 
   @override
   int get hashCode => super.hashCode;
+
+  @override
+  String toString() {
+    return "$name, $region, $country";
+  }
 }

@@ -23,7 +23,7 @@ class GooglePrediction extends Prediction {
       : super(
           id: json['place_id'],
           name: json['description'],
-          types: json['types'].cast<String>(),
+          types: json['types'] != null ? json['types'].cast<String>() : [],
         ) {
     matchedSubstrings = json['matched_substrings'] != null
         ? List<MatchedSubstring>.from(
@@ -75,6 +75,11 @@ class GooglePrediction extends Prediction {
       matchedSubstrings.hashCode ^
       structuredFormatting.hashCode ^
       terms.hashCode;
+
+  @override
+  String toString() {
+    return name;
+  }
 }
 
 class GoogleNewPrediction extends GooglePrediction {

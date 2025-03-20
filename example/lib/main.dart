@@ -31,8 +31,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final _yourAPIKey = 'pk.eyJ1Ijoib3V0ZXJseSIsImEiOiJjbTFxaWkyeHEwMGV5Mm1wcXcxaHN2dm9nIn0.yjx4QKtdR9MD1NFg-TguXA'; // fill with your Google API Key
-
+  final _yourAPIKey = null;
   final TextEditingController _textEditingController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool isLoading = false;
@@ -55,11 +54,11 @@ class _MyHomePageState extends State<MyHomePage> {
               Text('Selected Place: $_selectedPlace'),
               const SizedBox(height: 16),
               PlacesAutoComplete(
-                providerConfig: GooglePlacesProviderConfig(
+                providerConfig: MapboxPlacesProviderConfig(
                   apiKey: _yourAPIKey,
-                  proxyURL: 'https://placesautocomplete-production.up.railway.app/',
+                  proxyURL: 'https://cors-anywhere.herokuapp.com/',
                   countries: const ['US'],
-                  placeTypes: ['(cities)'],
+                  placeTypes: ['city'],
                 ),
                 textEditingController: _textEditingController,
                 focusNode: _focusNode,
@@ -101,6 +100,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 apiExceptionCallback: (e) {
                   log('apiExceptionCallback: $e');
                 },
+                displayStringForOption: (option) => option.toString(),
               ),
             ],
           ),

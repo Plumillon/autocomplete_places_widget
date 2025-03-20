@@ -79,6 +79,11 @@ class GooglePlacesProvider extends PlacesProvider {
 
       final response = await dio.get(url);
 
+      /// If there is an error message, consider it as an exception
+      if (response.data["error_message"] != null) {
+        throw Exception(response.data["error_message"]);
+      }
+
       predictions = response.data["predictions"] != null
           ? List<GooglePrediction>.from(response.data["predictions"]
               .map((prediction) => GooglePrediction.fromJson(prediction)))
@@ -123,11 +128,21 @@ class GooglePlacesProvider extends PlacesProvider {
   Future<List<Prediction>?> getPredictionsFromSharedPref() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     final json = prefs.getStringList(predictionHistoryKey);
+    List<Prediction>? predictions;
 
     if (json == null) {
       return null;
     }
 
-    return json.map((e) => GooglePrediction.fromJson(jsonDecode(e))).toList();
+    try {
+      predictions = json
+          .map(
+              (prediction) => GooglePrediction.fromJson(jsonDecode(prediction)))
+          .toList();
+    } catch (e) {
+      predictions = null;
+    }
+
+    return predictions;
   }
 }

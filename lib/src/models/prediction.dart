@@ -4,7 +4,13 @@ abstract class Prediction {
   late final String name;
   late final String id;
   late final List<String> types;
+
+  /// This field is filled during the second request
   PlaceDetails? details;
+
+  /// Those fields could be used to have details
+  /// without the need to fetch them in a second request
+  /// They are not always filled
   String? region;
   String? country;
   String? postalCode;
