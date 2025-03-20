@@ -1,6 +1,6 @@
 import 'dart:developer';
 
-import 'package:autocomplete_google_places_widget/autocomplete_google_places_widget.dart';
+import 'package:autocomplete_places_widget/autocomplete_places_widget.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -31,8 +31,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final _yourGoogleAPIKey = null; // fill with your Google API Key
-
+  final _yourAPIKey = null;
   final TextEditingController _textEditingController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   bool isLoading = false;
@@ -54,8 +53,13 @@ class _MyHomePageState extends State<MyHomePage> {
             children: [
               Text('Selected Place: $_selectedPlace'),
               const SizedBox(height: 16),
-              GPlacesAutoComplete(
-                googleAPIKey: _yourGoogleAPIKey,
+              PlacesAutoComplete(
+                providerConfig: MapboxPlacesProviderConfig(
+                  apiKey: _yourAPIKey,
+                  proxyURL: 'https://cors-anywhere.herokuapp.com/',
+                  countries: const ['US'],
+                  placeTypes: ['city'],
+                ),
                 textEditingController: _textEditingController,
                 focusNode: _focusNode,
                 textFormFieldBuilder: (BuildContext context,
@@ -84,21 +88,19 @@ class _MyHomePageState extends State<MyHomePage> {
                     isLoading = loading;
                   });
                 },
-                countries: const ['US'],
                 onOptionSelected: (option) {
                   log('onOptionSelected: ${option.toJson()}');
                   setState(() {
-                    _selectedPlace = option.description ?? '';
+                    _selectedPlace = option.name ?? '';
                   });
                 },
                 includeLatLng: true,
                 enableHistory: true,
                 liteModeHistory: true,
-                proxyURL: 'https://cors-anywhere.herokuapp.com/',
-                placeTypes: ['(cities)'],
                 apiExceptionCallback: (e) {
                   log('apiExceptionCallback: $e');
                 },
+                displayStringForOption: (option) => option.toString(),
               ),
             ],
           ),

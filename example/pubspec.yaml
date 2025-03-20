@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  autocomplete_google_places_widget:
+  autocomplete_places_widget:
     path: ../
 
 

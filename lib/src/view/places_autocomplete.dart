@@ -1,10 +1,11 @@
 import 'dart:async';
 import 'dart:developer';
 
-import 'package:autocomplete_google_places_widget/src/helpers/debouncer.dart';
-import 'package:autocomplete_google_places_widget/src/models/place_autocomplete_response.dart';
-import 'package:autocomplete_google_places_widget/src/models/prediction.dart';
-import 'package:autocomplete_google_places_widget/src/services/google_places_service.dart';
+import 'package:autocomplete_places_widget/src/helpers/debouncer.dart';
+import 'package:autocomplete_places_widget/src/models/prediction.dart';
+import 'package:autocomplete_places_widget/src/providers/google_places_provider.dart';
+import 'package:autocomplete_places_widget/src/providers/mapbox_places_provider.dart';
+import 'package:autocomplete_places_widget/src/providers/places_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -13,9 +14,12 @@ import 'package:flutter/scheduler.dart';
 /// option will be passed to the [onOptionSelected] callback.
 /// The options menu can be customized using the [menuBuilder] and
 /// [menuOptionBuilder] parameters.
-class GPlacesAutoComplete extends StatefulWidget {
-  /// The Google API key to use for the Places API.
-  final String? googleAPIKey;
+class PlacesAutoComplete extends StatefulWidget {
+  /// The places provider to use.
+  /// Depending on the passed [PlacesProviderConfig] type, the provider will be different.
+  /// [GooglePlacesProviderConfig]: Google Places API [https://developers.google.com/maps/documentation/places/web-service/overview]
+  /// [MapboxPlacesProviderConfig]: MapBox Places API [https://docs.mapbox.com/api/search/search-box/]
+  late final PlacesProvider provider;
 
   /// A callback that is called when the user selects an option.
   final void Function(Prediction)? onOptionSelected;
@@ -27,7 +31,7 @@ class GPlacesAutoComplete extends StatefulWidget {
   /// to make the widget work properly. Check the package example for more details.
   ///
   /// Note: You should not use your own TextEditingController and FocusNode with the [textFormFieldBuilder], instead you can use
-  /// the provided TextEditingController and FocusNode provided in [GPlacesAutoComplete] widget.
+  /// the provided TextEditingController and FocusNode provided in [PlacesAutoComplete] widget.
   final Widget Function(
           BuildContext, TextEditingController, FocusNode, void Function())?
       textFormFieldBuilder;
@@ -54,9 +58,6 @@ class GPlacesAutoComplete extends StatefulWidget {
   /// The time (in milliseconds) to wait after the user stops typing
   /// to make the API request.
   final int debounceTime;
-
-  /// The countries to restrict the search to (two-character region code).
-  final List<String>? countries;
 
   /// If true, the predictions will include the latitude and longitude of the
   /// place (an additional API request will be made to get the lat/lng).
@@ -121,27 +122,22 @@ class GPlacesAutoComplete extends StatefulWidget {
   /// }
   final void Function(Object apiExceptionCallback)? apiExceptionCallback;
 
-  /// The types of place results to return.
-  /// If null, all types will be returned.
-  /// See https://developers.google.com/places/web-service/supported_types
-  final List<String> placeTypes;
-
-  /// The proxy URL to use for the API request.
-  /// This can be used to bypass CORS restrictions.
-  /// Example: "https://cors-anywhere.herokuapp.com/"
-  final String? proxyURL;
+  /// A builder to customize how option are displayed.
+  /// This builder will be used to display the options in the text field when an option is selected
+  /// and in the prediction list.
+  /// If not provided, the default display [_PlacesAutoCompleteState._defaultDisplayStringForOption] will be used.
+  final String Function(Prediction)? displayStringForOption;
 
   /// Creates a new Google Places Autocomplete widget.
-  /// The [googleAPIKey] parameter is required.
-  const GPlacesAutoComplete({
+  /// The [apiKey] parameter is required if [proxyURL] is null.
+  PlacesAutoComplete({
     super.key,
-    this.googleAPIKey,
+    required PlacesProviderConfig providerConfig,
     this.onOptionSelected,
     this.menuOptionBuilder,
     this.textEditingController,
     this.focusNode,
     this.debounceTime = 500,
-    this.countries,
     this.includeLatLng = false,
     this.optionsMaxHeight = 275,
     this.optionsMaxWidth,
@@ -155,21 +151,37 @@ class GPlacesAutoComplete extends StatefulWidget {
     this.menuBorderRadius = 8.0,
     this.loadingCallback,
     this.apiExceptionCallback,
-    this.placeTypes = const [],
-    this.proxyURL,
-  }) : assert((focusNode == null) == (textEditingController == null));
+    this.displayStringForOption,
+  })  : assert((focusNode == null) == (textEditingController == null),
+            'textEditingController and focusNode must be provided together'),
+        assert(
+          providerConfig is GooglePlacesProviderConfig ||
+              providerConfig is MapboxPlacesProviderConfig,
+          'Invalid provider config',
+        ) {
+    switch (providerConfig.runtimeType) {
+      case GooglePlacesProviderConfig:
+        provider = GooglePlacesProvider(
+            config: providerConfig as GooglePlacesProviderConfig);
+        break;
+      case MapboxPlacesProviderConfig:
+        provider = MapboxPlacesProvider(
+            config: providerConfig as MapboxPlacesProviderConfig);
+        break;
+    }
+  }
 
   @override
-  State<GPlacesAutoComplete> createState() => _GPlacesAutoCompleteState();
+  State<PlacesAutoComplete> createState() => _PlacesAutoCompleteState();
 }
 
-class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
+class _PlacesAutoCompleteState extends State<PlacesAutoComplete> {
   // The query currently being searched for. If null, there is no pending
   // request.
   String? _currentQuery;
 
   // The most recent options received from the API.
-  late Iterable<Prediction> _lastPredicitons = <Prediction>[];
+  late Iterable<Prediction> _lastPredictions = <Prediction>[];
 
   late final Debounceable<Iterable<Prediction>?, String> _debouncedSearch;
 
@@ -179,18 +191,19 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
     if (query.isEmpty) {
       return _predictionsHistory;
     }
-    if (_lastPredicitons.contains(Prediction(description: query))) {
-      return _lastPredicitons;
-    }
-    if (_predictionsHistory.contains(Prediction(description: query))) {
-      return _predictionsHistory;
-    }
+
+    // if (_lastPredictions.contains(Prediction(name: query))) {
+    //   return _lastPredictions;
+    // }
+    // if (_predictionsHistory.contains(Prediction(name: query))) {
+    //   return _predictionsHistory;
+    // }
 
     _currentQuery = query;
 
-    late final Iterable<Prediction> predicitions;
+    late final Iterable<Prediction> predictions;
 
-    predicitions = await _insertPredicitions(_currentQuery!);
+    predictions = await _insertPredictions(_currentQuery!);
 
     // If another search happened after this one, throw away these options.
     if (_currentQuery != query) {
@@ -198,7 +211,7 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
     }
     _currentQuery = null;
 
-    return predicitions;
+    return predictions;
   }
 
   List<Prediction> _predictionsHistory = [];
@@ -208,7 +221,7 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
       return;
     }
     _predictionsHistory =
-        await GooglePlacesService.getPredictionsFromSharedPref() ?? [];
+        await widget.provider.getPredictionsFromSharedPref() ?? [];
     log("predictionsHistory: $_predictionsHistory");
   }
 
@@ -226,8 +239,8 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
     }
     _predictionsHistory.add(prediction);
     log("prediction added to history: $prediction");
-    GooglePlacesService.savePrediction(prediction,
-        liteMode: widget.liteModeHistory);
+    widget.provider
+        .savePrediction(prediction, liteMode: widget.liteModeHistory);
   }
 
   @override
@@ -238,8 +251,8 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
     getPredictionsHistory();
   }
 
-  static String _displayStringForPredicition(Prediction prediction) =>
-      prediction.description ?? '';
+  String _defaultDisplayStringForPrediction(Prediction prediction) =>
+      prediction.name ?? '';
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +260,8 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
     return RawAutocomplete<Prediction>(
       textEditingController: widget.textEditingController,
       focusNode: widget.focusNode,
-      displayStringForOption: _displayStringForPredicition,
+      displayStringForOption:
+          widget.displayStringForOption ?? _defaultDisplayStringForPrediction,
       fieldViewBuilder: (BuildContext context, TextEditingController controller,
           FocusNode focusNode, VoidCallback onFieldSubmitted) {
         return SizedBox(
@@ -269,9 +283,9 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
         final Iterable<Prediction>? options =
             await _debouncedSearch(textEditingValue.text);
         if (options == null) {
-          return _lastPredicitons;
+          return _lastPredictions;
         }
-        _lastPredicitons = options;
+        _lastPredictions = options;
         return options;
       },
       optionsViewBuilder: (context, onSelected, options) {
@@ -311,11 +325,9 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
                             onTap: () async {
                               onSelected(prediction);
                               if (widget.includeLatLng) {
-                                await GooglePlacesService
+                                await widget.provider
                                     .getPlaceDetailsFromPlaceId(
                                   prediction,
-                                  widget.googleAPIKey,
-                                  proxyURL: widget.proxyURL,
                                 );
                               }
                               widget.onOptionSelected?.call(prediction);
@@ -333,8 +345,11 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
                                       : 0.0),
                             )),
                             dense: widget.denseMenuOption,
-                            title: Text(_displayStringForPredicition(
-                                options.elementAt(index))),
+                            title: Text(widget.displayStringForOption != null
+                                ? widget.displayStringForOption!(
+                                    options.elementAt(index))
+                                : _defaultDisplayStringForPrediction(
+                                    options.elementAt(index))),
                           );
                     }),
                   );
@@ -347,22 +362,14 @@ class _GPlacesAutoCompleteState extends State<GPlacesAutoComplete> {
     );
   }
 
-  Future<Iterable<Prediction>> _insertPredicitions(String query) async {
+  Future<Iterable<Prediction>> _insertPredictions(String query) async {
     if (query == '') {
       return const Iterable<Prediction>.empty();
     }
     try {
       widget.loadingCallback?.call(true);
-      PlaceAutocompleteResponse response =
-          await GooglePlacesService.fetchPlaces(
-        query,
-        widget.googleAPIKey,
-        countries: widget.countries,
-        types: widget.placeTypes,
-        proxyURL: widget.proxyURL,
-      );
 
-      return response.predictions ?? [];
+      return await widget.provider.fetchPlaces(query);
     } catch (e) {
       widget.apiExceptionCallback?.call(e);
 
